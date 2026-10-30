@@ -4,9 +4,9 @@ Complete [installation](INSTALLATION.md) first. The brief and starter prompt bel
 
 ## 1. Prepare resources and a brief
 
-Place articles, PDF/DOCX documents, media, and reference videos under `resources/` inside `Video-Gen-Test/`. Copy selected news manually from the newsletter process; no scraper integration is needed here. Include the article title, publisher, URL and date with the source text.
+Place articles, PDF/DOCX documents, media, and reference videos under `resources/` inside this repository. Copy selected news manually from the newsletter process; no scraper integration is needed here. Include the article title, publisher, URL and date with the source text.
 
-From `Video-Gen-Test/`, copy the example into a new run folder:
+From the repository root (`code-montage/`), copy the example into a new run folder:
 
 ```bash
 mkdir -p runs/my-first-video
@@ -15,15 +15,14 @@ cp runs/example/brief.md runs/my-first-video/brief.md
 
 Edit the copied brief. Its current fields are **Project ID, Title, Duration, Voiceover language, Subtitles language, Newspaper path, and Remarks**. Add, remove, rename, or change fields as needed. Use Remarks for audience, required points, exclusions, style, budget, or other instructions that matter for this run.
 
-Use paths relative to `Video-Gen-Test/` for sources. The example's newspaper path is a placeholder: replace it with a real file before starting. Supporting documents and media can be referenced in Remarks or in additional fields. Keep the Project ID unique for each production.
+Use paths relative to the repository root for sources. The example's newspaper path is a placeholder: replace it with a real file before starting. Supporting documents and media can be referenced in Remarks or in additional fields. Keep the Project ID unique for each production.
 
 ## 2. Launch OpenCode
 
-From the parent repository root, activate the existing environment and enter the trial folder:
+From the repository root (`code-montage/`), activate the existing environment:
 
 ```bash
 source venv/bin/activate
-cd Video-Gen-Test
 ```
 
 Choose one interface:
@@ -31,7 +30,7 @@ Choose one interface:
 | Interface | Command | Next step |
 | --- | --- | --- |
 | Terminal / CLI | `opencode` | Enter instructions in the terminal conversation. |
-| Web | `opencode web --hostname 127.0.0.1 --port 4096` | Open the printed local URL and select `Video-Gen-Test` as the project. |
+| Web | `opencode web --hostname 127.0.0.1 --port 4096` | Open the printed local URL and select `code-montage` as the project. |
 
 Keep the web server's terminal open while using the browser; stop it with Ctrl+C. If port 4096 is busy, choose another port. Use Build mode when the agent needs to execute production tools.
 
@@ -50,9 +49,9 @@ Confirm the selected model before sending the production request. A model-provid
 | --- | --- | --- |
 | Start a new conversation | Enter `/new`. | Choose the new-session control. |
 | Switch conversations | Enter `/sessions` and select the intended session. | Select the session in the project's session list. |
-| Resume after closing | Launch `opencode --continue` from `Video-Gen-Test` for the last session, or use `/sessions`. | Restart the web server from `Video-Gen-Test` and select the existing session. |
+| Resume after closing | Launch `opencode --continue` from the repository root for the last session, or use `/sessions`. | Restart the web server from the repository root and select the existing session. |
 
-Use a new session and Project ID for a separate video. For revisions to an existing video, return to its session and name the relevant artifact/version. A new conversation does not automatically create a separate production directory. Sessions are stored by OpenCode in its local application data, while production artifacts remain in the trial folder.
+Use a new session and Project ID for a separate video. For revisions to an existing video, return to its session and name the relevant artifact/version. A new conversation does not automatically create a separate production directory. Sessions are stored by OpenCode in its local application data, while production artifacts remain in this repository.
 
 ## 5. Send an editable starter prompt
 
@@ -64,9 +63,9 @@ runs/my-first-video/brief.md and the source files it references.
 Read OpenMontage/AGENT_GUIDE.md and OpenMontage/PROJECT_CONTEXT.md,
 then follow the appropriate pipeline and stage instructions.
 
-Work only inside Video-Gen-Test. Do not inspect or modify sibling
+Work only inside this code-montage repository. Do not inspect or modify sibling
 projects. Run OpenMontage commands from its own directory using the
-already activated parent-repository venv; do not create another one.
+already activated repository-root venv; do not create another one.
 Use the brief's Project ID for OpenMontage/projects/<project-id>/.
 
 Treat the current brief as the source of project requirements. Ask about
@@ -106,11 +105,11 @@ Check that the agent actually pauses at your chosen checkpoints. If an approved 
 
 ## 7. Inspect Backlot and access the video
 
-In a second terminal, from the parent repository root:
+In a second terminal, from the repository root (`code-montage/`):
 
 ```bash
 source venv/bin/activate
-cd Video-Gen-Test/OpenMontage
+cd OpenMontage
 python -m backlot open
 ```
 

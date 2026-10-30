@@ -10,3 +10,5 @@
 .env.*
 !.env.example
 node_modules/
+
+venv
