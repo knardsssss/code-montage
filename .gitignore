@@ -1,0 +1,12 @@
+# Local upstream checkout, inputs, production files, and test records.
+/OpenMontage/
+/resources/
+/runs/*
+!/runs/example/
+/runs/example/*
+!/runs/example/brief.md
+/opencode.json
+.env
+.env.*
+!.env.example
+node_modules/

@@ -1,0 +1,11 @@
+# Install from the repository root, after cloning OpenMontage as described in INSTALLATION.md:
+#   python -m pip install -r Video-Gen-Test/requirements.txt
+# pip resolves this include relative to THIS file, regardless of the working directory.
+-r OpenMontage/requirements.txt
+
+# Offline English voiceover (voice models are downloaded separately).
+piper-tts>=1.2.0
+
+# Read the PDF/DOCX source materials used in the manual trial.
+pypdf>=5.0
+python-docx>=1.1.0
