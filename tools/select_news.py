@@ -14,13 +14,20 @@ import re
 import sys
 from pathlib import Path
 
-from newsletter_common import REPO_ROOT, load_json, validate_selected_news, write_json
+from newsletter_common import (
+    DEFAULT_ASPECT_RATIO,
+    DEFAULT_AUDIENCE,
+    DEFAULT_PURPOSE,
+    REPO_ROOT,
+    load_json,
+    validate_selected_news,
+    write_json,
+)
 
-DEFAULT_PURPOSE = "training"
+ASPECT_RATIOS = ("16:9", "1:1", "9:16")
 DEFAULT_DURATION = {"training": "3-4 min", "reel": "60s"}
 DEFAULT_VOICEOVER = "en"
 DEFAULT_SUBTITLES = ["en", "zh-Hant", "zh-Hans"]
-DEFAULT_AUDIENCE = "compliance staff at licensed corporations"
 SLUG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 
@@ -93,6 +100,12 @@ def parse_purpose(text):
     raise SelectionError("purpose must be training or reel")
 
 
+def parse_aspect_ratio(text):
+    if text in ASPECT_RATIOS:
+        return text
+    raise SelectionError(f"aspect ratio must be one of {', '.join(ASPECT_RATIOS)}")
+
+
 def split_languages(text):
     return [part.strip() for part in text.split(",") if part.strip()]
 
@@ -107,6 +120,7 @@ def build_document(source, selected_ids, project_id, video):
             "summary_bullets": item["summary_bullets"],
             "source_url": item["source_url"],
             **({"source_ref": item["source_ref"]} if item.get("source_ref") else {}),
+            **({"publication_date": item["publication_date"]} if item.get("publication_date") else {}),
             "pages": item["pages"],
             "selected": item["id"] in selected_ids,
         }
@@ -126,10 +140,12 @@ def main(argv=None):
     parser.add_argument("items_file", type=Path, help="newsletter_items.json from extract_newsletter.py")
     parser.add_argument("--ids", help='item numbers or ids, for example "7,15", "1,3-5" or "all"')
     parser.add_argument("--project-id", help="lowercase hyphenated slug, unique per video")
+    parser.add_argument("--title", help="video title; defaults to the newsletter title and issue")
     parser.add_argument("--purpose", choices=sorted(DEFAULT_DURATION))
     parser.add_argument("--duration", help='for example "3-4 min" or "60s"')
+    parser.add_argument("--aspect-ratio", choices=ASPECT_RATIOS)
     parser.add_argument("--voiceover-language")
-    parser.add_argument("--subtitle-languages", help='comma-separated, for example "en,zh-Hant,zh-Hans"')
+    parser.add_argument("--subtitle-languages", help='comma-separated, first is burned in, for example "en,zh-Hant,zh-Hans"; empty for none')
     parser.add_argument("--audience")
     parser.add_argument("--remarks")
     parser.add_argument("-o", "--output", type=Path, help="default: runs/<project_id>/selected_news.json")
@@ -159,19 +175,29 @@ def main(argv=None):
             project_id = args.project_id or ask_until_valid(
                 "Project ID", f"regulatory-update-{issue}", parse_project_id
             )
+            title = args.title or ask("Video title (optional)")
             purpose = args.purpose or ask_until_valid("Purpose (training/reel)", DEFAULT_PURPOSE, parse_purpose)
             duration = args.duration or ask("Duration target", DEFAULT_DURATION[purpose])
+            aspect_ratio = args.aspect_ratio or ask_until_valid(
+                f"Aspect ratio ({', '.join(ASPECT_RATIOS)})", DEFAULT_ASPECT_RATIO, parse_aspect_ratio
+            )
             voiceover = args.voiceover_language or ask("Voiceover language", DEFAULT_VOICEOVER)
-            subtitles = args.subtitle_languages or ask("Subtitle languages", ",".join(DEFAULT_SUBTITLES))
+            subtitles = (
+                args.subtitle_languages
+                if args.subtitle_languages is not None
+                else ask("Subtitle languages, first is burned in", ",".join(DEFAULT_SUBTITLES))
+            )
             audience = args.audience if args.audience is not None else ask("Audience", DEFAULT_AUDIENCE)
             remarks = args.remarks if args.remarks is not None else ask("Remarks (optional)")
         else:
             selected_ids = parse_selection(args.ids, items)
             project_id = parse_project_id(args.project_id)
+            title = args.title
             purpose = args.purpose or DEFAULT_PURPOSE
             duration = args.duration or DEFAULT_DURATION[purpose]
+            aspect_ratio = args.aspect_ratio or DEFAULT_ASPECT_RATIO
             voiceover = args.voiceover_language or DEFAULT_VOICEOVER
-            subtitles = args.subtitle_languages or ",".join(DEFAULT_SUBTITLES)
+            subtitles = args.subtitle_languages if args.subtitle_languages is not None else ",".join(DEFAULT_SUBTITLES)
             audience = args.audience if args.audience is not None else DEFAULT_AUDIENCE
             remarks = args.remarks or ""
     except SelectionError as error:
@@ -186,8 +212,10 @@ def main(argv=None):
         selected_ids,
         project_id,
         {
+            **({"title": title} if title else {}),
             "purpose": purpose,
             "duration_target": duration,
+            "aspect_ratio": aspect_ratio,
             "voiceover_language": voiceover,
             "subtitle_languages": split_languages(subtitles),
             "audience": audience,

@@ -146,6 +146,46 @@ class SamplePdfTests(unittest.TestCase):
         self.assertNotIn("cross-border fund offerings", json.dumps(self.items))
 
 
+class PublicationDateTests(unittest.TestCase):
+    def result(self, url=SFC + "26PR1", reference="26PR1"):
+        return {"items": [{"id": "item-01", "source_url": url, "source_ref": reference}], "warnings": []}
+
+    def fail(self, error):
+        def fetch(reference):
+            raise error
+        return fetch
+
+    def test_date_comes_from_the_source(self):
+        result = self.result()
+        extractor.add_publication_dates(result, lambda reference: "2026-07-28T16:18:28.305")
+        self.assertEqual(result["items"][0]["publication_date"], "2026-07-28")
+        self.assertEqual(result["warnings"], [])
+
+    def test_failures_are_reported_and_no_date_is_guessed(self):
+        fetches = [
+            self.fail(OSError("offline")),
+            self.fail(KeyError("issueDate")),
+            lambda reference: "not a date",
+            lambda reference: None,
+        ]
+        for fetch in fetches:
+            result = self.result()
+            extractor.add_publication_dates(result, fetch)
+            self.assertNotIn("publication_date", result["items"][0])
+            self.assertEqual(len(result["warnings"]), 1)
+
+    def test_other_publishers_are_reported_without_a_request(self):
+        result = self.result(url="https://example.com/a?refNo=1")
+        extractor.add_publication_dates(result, self.fail(AssertionError("should not fetch")))
+        self.assertNotIn("publication_date", result["items"][0])
+        self.assertIn("not an SFC release", result["warnings"][0])
+
+    def test_item_without_a_link_is_skipped(self):
+        result = self.result(url=None, reference=None)
+        extractor.add_publication_dates(result, self.fail(AssertionError("should not fetch")))
+        self.assertEqual(result["warnings"], [])
+
+
 class AssemblyTests(unittest.TestCase):
     """Layouts the sample PDF does not contain, built from positioned lines."""
 
@@ -216,6 +256,7 @@ def items_file(directory):
                         "summary_bullets": [f"Bullet {number}."],
                         "source_url": SFC + f"26PR{number}",
                         "source_ref": f"26PR{number}",
+                        "publication_date": f"2026-07-0{number}",
                         "pages": [number],
                     }
                     for number in (1, 2, 3)
@@ -266,18 +307,43 @@ class SelectNewsTests(unittest.TestCase):
         self.assertEqual(sum(item["selected"] for item in self.output()["items"]), 3)
 
     def test_prompts_use_defaults(self):
-        result = self.select(stdin="2\nfrom-prompts\n\n\n\n\n\n\n")
+        result = self.select(stdin="2\nfrom-prompts\n\n\n\n\n\n\n\n\n")
         self.assertEqual(result.returncode, 0, result.stderr)
         document = self.output("from-prompts")
         self.assertEqual(document["video"]["purpose"], "training")
         self.assertEqual(document["video"]["duration_target"], "3-4 min")
         self.assertEqual(document["video"]["voiceover_language"], "en")
+        self.assertEqual(document["video"]["aspect_ratio"], "16:9")
+        self.assertNotIn("title", document["video"])
 
     def test_prompt_rejects_a_bad_slug_then_accepts_a_good_one(self):
-        result = self.select(stdin="2\nweekly update\nweekly-update\n\n\n\n\n\n\n")
+        result = self.select(stdin="2\nweekly update\nweekly-update\n\n\n\n\n\n\n\n\n")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("weekly-update", result.stderr)
         self.assertEqual(self.output("weekly-update")["project_id"], "weekly-update")
+
+    def test_prompt_rejects_an_unsupported_aspect_ratio_then_accepts_a_good_one(self):
+        result = self.select(stdin="2\ndemo\n\n\n\n3:4\n9:16\n\n\n\n\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("aspect ratio must be", result.stderr)
+        self.assertEqual(self.output()["video"]["aspect_ratio"], "9:16")
+
+    def test_title_aspect_ratio_and_publication_date_reach_the_file(self):
+        result = self.select("--ids", "1", "--project-id", "demo", "--title", "My video", "--aspect-ratio", "9:16")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        document = self.output()
+        self.assertEqual(document["video"]["title"], "My video")
+        self.assertEqual(document["video"]["aspect_ratio"], "9:16")
+        self.assertEqual(document["items"][0]["publication_date"], "2026-07-01")
+
+    def test_subtitles_can_be_turned_off(self):
+        self.assertEqual(self.select("--ids", "1", "--project-id", "demo", "--subtitle-languages", "").returncode, 0)
+        self.assertEqual(self.output()["video"]["subtitle_languages"], [])
+
+    def test_aspect_ratios_match_the_schema(self):
+        import select_news
+        schema = json.loads((REPO_ROOT / "schemas" / "selected_news.schema.json").read_text(encoding="utf-8"))
+        self.assertEqual(list(select_news.ASPECT_RATIOS), schema["$defs"]["video"]["properties"]["aspect_ratio"]["enum"])
 
     def test_bad_slug_is_rejected(self):
         result = self.select("--ids", "1", "--project-id", "weekly update")
@@ -322,7 +388,7 @@ class SchemaTests(unittest.TestCase):
                     "selected": True,
                 }
             ],
-            "video": {"purpose": "training", "duration_target": "60s"},
+            "video": {"duration_target": "60s"},
         }
 
     def assert_invalid(self, document, fragment):
@@ -331,6 +397,21 @@ class SchemaTests(unittest.TestCase):
 
     def test_minimal_document_is_valid(self):
         self.assertEqual(validate_selected_news(self.document()), [])
+
+    def test_new_fields_are_checked(self):
+        document = self.document()
+        document["items"][0]["publication_date"] = "2026-07-28"
+        document["video"].update(title="My video", aspect_ratio="9:16", purpose="reel")
+        self.assertEqual(validate_selected_news(document), [])
+
+        document["items"][0]["publication_date"] = "28 July 2026"
+        self.assert_invalid(document, "publication_date")
+        document = self.document()
+        document["video"]["aspect_ratio"] = "3:4"
+        self.assert_invalid(document, "aspect_ratio")
+        document = self.document()
+        document["video"]["title"] = ""
+        self.assert_invalid(document, "title")
 
     def test_source_url_is_required_and_must_be_a_url(self):
         document = self.document()
@@ -427,6 +508,71 @@ class BriefTests(unittest.TestCase):
         self.selected.write_text(json.dumps(document), encoding="utf-8")
         self.assertEqual(self.brief("--force").returncode, 0)
         self.assertNotIn("api/news/content", self.field("Remarks"))
+
+    def rewrite_video(self, **changes):
+        document = json.loads(self.selected.read_text(encoding="utf-8"))
+        document["video"].update(changes)
+        self.selected.write_text(json.dumps(document), encoding="utf-8")
+
+    def test_title_comes_from_the_file_unless_the_flag_overrides_it(self):
+        self.rewrite_video(title="From the file")
+        self.assertEqual(self.brief().returncode, 0)
+        self.assertEqual(self.field("Title"), "From the file")
+        self.assertEqual(self.brief("--force", "--title", "From the flag").returncode, 0)
+        self.assertEqual(self.field("Title"), "From the flag")
+
+    def test_remarks_state_the_aspect_ratio(self):
+        self.rewrite_video(aspect_ratio="9:16")
+        self.assertEqual(self.brief().returncode, 0)
+        self.assertIn("Aspect ratio: 9:16.", self.field("Remarks"))
+
+    def test_optional_settings_take_their_defaults(self):
+        document = json.loads(self.selected.read_text(encoding="utf-8"))
+        document["video"] = {"duration_target": "60s"}
+        self.selected.write_text(json.dumps(document), encoding="utf-8")
+        self.assertEqual(self.brief().returncode, 0)
+        remarks = self.field("Remarks")
+        for phrase in ("Purpose: training.", "Aspect ratio: 16:9.", "Audience: compliance staff at licensed corporations."):
+            self.assertIn(phrase, remarks)
+
+    def test_first_subtitle_language_is_burned_in(self):
+        self.assertEqual(self.brief().returncode, 0)
+        self.assertIn(
+            "burn English into the picture and embed Traditional Chinese, Simplified Chinese as selectable tracks",
+            self.field("Remarks"),
+        )
+        self.rewrite_video(subtitle_languages=["zh-Hant"])
+        self.assertEqual(self.brief("--force").returncode, 0)
+        self.assertIn("burn Traditional Chinese into the picture.", self.field("Remarks"))
+
+    def test_no_subtitles(self):
+        self.rewrite_video(subtitle_languages=[])
+        self.assertEqual(self.brief().returncode, 0)
+        self.assertEqual(self.field("Subtitles language"), "None")
+        self.assertIn("No subtitles.", self.field("Remarks"))
+
+    def test_remarks_ask_for_one_final_approval(self):
+        self.assertEqual(self.brief().returncode, 0)
+        remarks = self.field("Remarks")
+        for phrase in ("category approval_policy", "Final approval is not pre-authorized", "awaiting_human",
+                       "If I request changes, apply only those, re-render and stop again."):
+            self.assertIn(phrase, remarks)
+
+    def test_remarks_rule_out_unsupported_relative_dates(self):
+        self.assertEqual(self.brief().returncode, 0)
+        self.assertIn("relative wording", self.field("Remarks"))
+
+    def test_item_file_uses_the_publication_date_when_known(self):
+        self.assertEqual(self.brief().returncode, 0)
+        folder = self.root / "resources" / "demo"
+        self.assertIn("- Date: 2026-07-03 (publication date", (folder / "item-03.md").read_text(encoding="utf-8"))
+
+        document = json.loads(self.selected.read_text(encoding="utf-8"))
+        for item in document["items"]:
+            del item["publication_date"]
+        self.selected.write_text(json.dumps(document), encoding="utf-8")
+        self.assertEqual(self.brief("--force").returncode, 0)
+        self.assertIn("- Date: 2026-07 (newsletter issue", (folder / "item-03.md").read_text(encoding="utf-8"))
 
     def test_a_resource_file_for_each_selected_item_only(self):
         self.assertEqual(self.brief().returncode, 0)

@@ -76,6 +76,11 @@
           "type": "string",
           "minLength": 1
         },
+        "publication_date": {
+          "description": "Date the source was published, YYYY-MM-DD. Not the newsletter's issue date.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        },
         "pages": {
           "description": "Newsletter pages the item appears on, starting at 1.",
           "type": "array",
@@ -87,25 +92,39 @@
     "video": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["purpose", "duration_target"],
+      "required": ["duration_target"],
       "properties": {
-        "purpose": { "type": "string", "enum": ["training", "reel"] },
+        "title": {
+          "description": "Video title. Defaults to the newsletter title and issue.",
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": { "type": "string", "enum": ["training", "reel"], "default": "training" },
         "duration_target": {
           "description": "Free text, for example \"3-4 min\" or \"60s\".",
           "type": "string",
           "minLength": 1
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": ["16:9", "1:1", "9:16"],
+          "default": "16:9"
         },
         "voiceover_language": {
           "$ref": "#/$defs/language",
           "default": "en"
         },
         "subtitle_languages": {
+          "description": "The first language is burned into the picture and the rest are selectable tracks. Empty means no subtitles.",
           "type": "array",
           "items": { "$ref": "#/$defs/language" },
           "uniqueItems": true,
           "default": ["en", "zh-Hant", "zh-Hans"]
         },
-        "audience": { "type": "string" },
+        "audience": {
+          "type": "string",
+          "default": "compliance staff at licensed corporations"
+        },
         "remarks": { "type": "string" }
       }
     },

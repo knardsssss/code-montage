@@ -8,6 +8,10 @@ from jsonschema import Draft202012Validator
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = REPO_ROOT / "schemas" / "selected_news.schema.json"
 
+DEFAULT_PURPOSE = "training"
+DEFAULT_ASPECT_RATIO = "16:9"
+DEFAULT_AUDIENCE = "compliance staff at licensed corporations"
+
 
 def load_json(path):
     with open(path, encoding="utf-8") as handle:

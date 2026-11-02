@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Split a newsletter PDF into news items and match each to its source link.
 
-Usage: python tools/extract_newsletter.py <pdf> [-o newsletter_items.json]
+Usage: python tools/extract_newsletter.py <pdf> [-o newsletter_items.json] [--fetch-dates]
 
 The output defaults to newsletter_items.json next to the PDF. Exits with 2 if
 any item has no source link; those items are reported with source_url null,
-never guessed.
+never guessed. The PDF does not give each item's publication date, so
+--fetch-dates reads it from the SFC release; any date it cannot read is
+reported and left out.
 """
 
 import argparse
@@ -13,7 +15,10 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
+from urllib.parse import urlencode, urlparse
+from urllib.request import Request, urlopen
 
 from pypdf import PdfReader
 
@@ -42,6 +47,9 @@ MONTHS = {
 }
 ISSUE_DATE = re.compile(rf"^({'|'.join(MONTHS)})\s+(\d{{4}})$")
 WHAT_THIS_MEANS = "What this means:"
+
+SFC_HOST = "apps.sfc.hk"
+SFC_CONTENT_API = "https://apps.sfc.hk/edistributionWeb/api/news/content"
 
 
 @dataclass
@@ -296,10 +304,33 @@ def extract(path):
     return build_output(path, masthead, issue_date, summary, items, unmatched_links, warnings)
 
 
+def fetch_sfc_date(reference):
+    query = urlencode({"refNo": reference, "lang": "EN"})
+    request = Request(f"{SFC_CONTENT_API}?{query}", headers={"User-Agent": "Mozilla/5.0"})
+    with urlopen(request, timeout=30) as response:
+        return json.load(response)["issueDate"]
+
+
+def add_publication_dates(result, fetch=fetch_sfc_date):
+    """Add each item's publication date from its source; report any it cannot read."""
+    for item in result["items"]:
+        url = item["source_url"]
+        if not url:
+            continue
+        if urlparse(url).netloc != SFC_HOST or not item["source_ref"]:
+            result["warnings"].append(f"{item['id']}: no publication date, not an SFC release: {url}")
+            continue
+        try:
+            item["publication_date"] = date.fromisoformat(fetch(item["source_ref"])[:10]).isoformat()
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            result["warnings"].append(f"{item['id']}: could not read publication date: {error}")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Split a newsletter PDF into news items.")
     parser.add_argument("pdf", type=Path)
     parser.add_argument("-o", "--output", type=Path, help="default: newsletter_items.json next to the PDF")
+    parser.add_argument("--fetch-dates", action="store_true", help="read each item's publication date from its SFC release")
     args = parser.parse_args(argv)
 
     if not args.pdf.is_file():
@@ -309,6 +340,9 @@ def main(argv=None):
     if not result["items"]:
         print("error: no news items found. Does this PDF have a text layer?", file=sys.stderr)
         return 1
+
+    if args.fetch_dates:
+        add_publication_dates(result)
 
     output = args.output or args.pdf.parent / "newsletter_items.json"
     output.parent.mkdir(parents=True, exist_ok=True)
