@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://3pointscompliance.com/schemas/selected_news.schema.json",
+  "title": "Selected news for one compliance video",
+  "description": "Contract between the newsletter system and the video pipeline. See schemas/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "newsletter", "items", "video"],
+  "properties": {
+    "project_id": {
+      "description": "Lowercase hyphenated slug, unique per video. Used as a folder name.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 80
+    },
+    "newsletter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "issue_date", "file_path"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "issue_date": {
+          "description": "YYYY-MM, or YYYY-MM-DD when the issue has an exact date.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?$"
+        },
+        "file_path": {
+          "description": "Newsletter PDF, relative to the repository root.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "items": {
+      "description": "Every candidate item. Only items with selected=true go into the video; at least one must be selected.",
+      "type": "array",
+      "minItems": 1,
+      "contains": {
+        "type": "object",
+        "required": ["selected"],
+        "properties": { "selected": { "const": true } }
+      },
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "video": { "$ref": "#/$defs/video" }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "section", "title", "summary_bullets", "source_url", "selected"],
+      "properties": {
+        "id": {
+          "description": "Unique within this file. Used as a file name.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+        },
+        "section": {
+          "type": "string",
+          "enum": ["corporate", "enforcement", "mas", "other"]
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "summary_bullets": {
+          "description": "Newsletter text for this item. An AI summary, not a primary source.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "source_url": {
+          "description": "Original article. The pattern is enforced because jsonschema skips format: uri unless an optional package is installed.",
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://[^\\s]+$"
+        },
+        "source_ref": {
+          "description": "Publisher's reference, for example 26PR115.",
+          "type": "string",
+          "minLength": 1
+        },
+        "pages": {
+          "description": "Newsletter pages the item appears on, starting at 1.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "selected": { "type": "boolean" }
+      }
+    },
+    "video": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purpose", "duration_target"],
+      "properties": {
+        "purpose": { "type": "string", "enum": ["training", "reel"] },
+        "duration_target": {
+          "description": "Free text, for example \"3-4 min\" or \"60s\".",
+          "type": "string",
+          "minLength": 1
+        },
+        "voiceover_language": {
+          "$ref": "#/$defs/language",
+          "default": "en"
+        },
+        "subtitle_languages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/language" },
+          "uniqueItems": true,
+          "default": ["en", "zh-Hant", "zh-Hans"]
+        },
+        "audience": { "type": "string" },
+        "remarks": { "type": "string" }
+      }
+    },
+    "language": {
+      "description": "BCP 47 language tag, for example en or zh-Hant.",
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]+)*$"
+    }
+  }
+}

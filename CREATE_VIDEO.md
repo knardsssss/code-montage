@@ -4,7 +4,25 @@ Complete [installation](INSTALLATION.md) first. The brief and starter prompt bel
 
 ## 1. Prepare resources and a brief
 
-Place articles, PDF/DOCX documents, media, and reference videos under `resources/` inside this repository. Copy selected news manually from the newsletter process; no scraper integration is needed here. Include the article title, publisher, URL and date with the source text.
+Place articles, PDF/DOCX documents, media, and reference videos under `resources/` inside this repository. Generate the brief from a newsletter PDF, or copy selected news manually and write it yourself. For manual sources, include the article title, publisher, URL and date with the source text.
+
+### From a newsletter PDF
+
+From the repository root (`code-montage/`), with `venv/` active:
+
+```bash
+python tools/extract_newsletter.py resources/newsletters/your_newsletter.pdf
+python tools/select_news.py resources/newsletters/newsletter_items.json
+python tools/newsletter_to_brief.py runs/your-project-id/selected_news.json
+```
+
+The first script splits the PDF into items and reports any item without a source link. The second lists the items and prompts for your choices and the video settings; pass `--ids` and `--project-id` to skip the prompts. The third writes `runs/<project-id>/brief.md` and one source file per selected item under `resources/<project-id>/`. Neither of the last two replaces existing files unless you pass `--force`. Run `python <script> --help` for all options.
+
+Review the generated brief before starting. Its Remarks tell the agent that the newsletter text is an AI summary and that every factual claim must be checked against and cite the original source.
+
+To test the scripts, run `python -m unittest discover -s tests`. Tests that use the sample newsletter are skipped unless it is at `resources/newsletters/sample_newsletter.pdf`.
+
+### Writing the brief manually
 
 From the repository root (`code-montage/`), copy the example into a new run folder:
 
