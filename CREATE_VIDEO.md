@@ -4,7 +4,25 @@ Complete [installation](INSTALLATION.md) first. The brief and starter prompt bel
 
 ## 1. Prepare resources and a brief
 
-Place articles, PDF/DOCX documents, media, and reference videos under `resources/` inside this repository. Copy selected news manually from the newsletter process; no scraper integration is needed here. Include the article title, publisher, URL and date with the source text.
+Place articles, PDF/DOCX documents, media, and reference videos under `resources/` inside this repository. Generate the brief from a newsletter PDF, or copy selected news manually and write it yourself. For manual sources, include the article title, publisher, URL and date with the source text.
+
+### From a newsletter PDF
+
+From the repository root (`code-montage/`), with `venv/` active:
+
+```bash
+python tools/extract_newsletter.py resources/newsletters/your_newsletter.pdf --fetch-dates
+python tools/select_news.py resources/newsletters/newsletter_items.json
+python tools/newsletter_to_brief.py runs/your-project-id/selected_news.json
+```
+
+The first script splits the PDF into items and reports any item without a source link; `--fetch-dates` reads each publication date from its SFC release and reports any it cannot read. The second lists the items and prompts for your choices and the video settings; pass `--ids` and `--project-id` to skip the prompts. The third writes `runs/<project-id>/brief.md` and one source file per selected item under `resources/<project-id>/`. Neither of the last two replaces existing files unless you pass `--force`. Run `python <script> --help` for all options.
+
+Review the generated brief before starting. Its Remarks tell the agent that the newsletter text is an AI summary and that every factual claim must be checked against and cite the original source. They also set up a single final approval: the agent runs through the earlier review gates, then stops at the final video so you can request changes or approve it.
+
+To test the scripts, run `python -m unittest discover -s tests`. Tests that use the sample newsletter are skipped unless it is at `resources/newsletters/sample_newsletter.pdf`.
+
+### Writing the brief manually
 
 From the repository root (`code-montage/`), copy the example into a new run folder:
 
@@ -78,10 +96,11 @@ Use programmatic graphics, licensed sourced media, or supplied media.
 Do not generate AI images or AI video clips, including fallback assets.
 Flag uncertain claims or conflicting sources and cite factual statements.
 
-Start with an alignment proposal and stop for my review. Then work
-through script, storyboard/scene plan, media, and final video, waiting
-for my explicit approval at each checkpoint before proceeding.
-Map these checkpoints to the chosen upstream pipeline before starting.
+I pre-authorize every review gate before the final video. Record that
+as a decision_log entry with category approval_policy and do not stop at
+those gates, except for a source you cannot fetch or any paid service.
+Stop at the final video for my approval, which is not pre-authorized.
+If I request changes, apply only those, re-render and stop again.
 Save versioned deliverables and provide actual file paths in chat.
 Use Backlot-compatible production artifacts where supported.
 ```
@@ -93,15 +112,16 @@ Review the proposal, script, scene plan, media, and final video through the link
 Send feedback and approvals in OpenCode, for example:
 
 ```text
-Revise script v1: explain the reporting deadline more clearly and cite
-its source. Keep the other approved points. Stop after the revision.
+Request changes to final video v1: explain the reporting deadline more
+clearly and cite its source. Keep everything else. Re-render and stop
+for my approval.
 ```
 
 ```text
-Approve script v2. Proceed to the storyboard only, then stop for review.
+Approve final video v2.
 ```
 
-Check that the agent actually pauses at your chosen checkpoints. If an approved script changes, review affected scenes and media again.
+Check that the agent actually stops for final approval. If a requested change affects the script, review the affected scenes and media again.
 
 ## 7. Inspect Backlot and access the video
 

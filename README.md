@@ -1,10 +1,11 @@
 # OpenCode + OpenMontage video trial
 
-Use OpenCode to run OpenMontage and create compliance videos from resources placed in this repository. This is a manual video-production trial; no application development is required.
+Use OpenCode to run OpenMontage and create compliance videos from resources placed in this repository. Video production is a manual trial in OpenCode. The scripts in `tools/` prepare its input by turning a newsletter PDF into a brief.
 
 - [Installation](INSTALLATION.md): set up the root virtual environment, Git, OpenMontage, and OpenCode on your own computer.
-- [Create a video](CREATE_VIDEO.md): prepare resources, edit the brief and prompt, choose a model, manage sessions, and review outputs.
+- [Create a video](CREATE_VIDEO.md): prepare resources, generate or edit the brief and prompt, choose a model, manage sessions, and review outputs.
 - [Example brief](runs/example/brief.md): copy and adapt this for each video.
+- [Selected news format](schemas/README.md): the JSON file that hands selected newsletter items to the brief generator.
 
 For now, select **Big Pickle** under the **OpenCode Zen** label in OpenCode's model selector. Model availability can change without notice; if it is missing, check with the team before choosing a replacement.
 
